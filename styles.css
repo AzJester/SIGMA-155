@@ -1,0 +1,206 @@
+/* SIGMA 155: FIRE MISSION — UI styling: military fire-direction-terminal look */
+
+:root {
+  --green: #7dff9a;
+  --green-dim: #3f8f56;
+  --amber: #ffb454;
+  --red: #ff5f56;
+  --cyan: #6fd7ff;
+  --ink: #e8f0e8;
+  --bg: #060c08;
+  --panel: rgba(8, 16, 10, 0.92);
+  --mono: Consolas, Menlo, "DejaVu Sans Mono", "Courier New", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+#game {
+  position: fixed; inset: 0;
+  display: block;
+  cursor: crosshair;
+}
+
+/* ---------- CRT filter ---------- */
+#crt-fx { display: none; }
+body.crt #crt-fx {
+  display: block;
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.38) 100%);
+}
+
+/* ---------- overlay screens ---------- */
+#overlay {
+  position: fixed; inset: 0;
+  z-index: 40;
+  display: none;
+}
+#overlay.visible { display: block; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 5, 3, 0.55);
+  overflow-y: auto;
+  padding: 4vh 16px;
+}
+
+.frame {
+  width: min(720px, 94vw);
+  background: var(--panel);
+  border: 1px solid rgba(125, 255, 154, 0.45);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 42px rgba(125, 255, 154, 0.09), inset 0 0 60px rgba(0, 0, 0, 0.45);
+  padding: 28px 34px 24px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+h1 {
+  font-size: 19px;
+  letter-spacing: 0.22em;
+  color: var(--green);
+  border-bottom: 1px solid rgba(125, 255, 154, 0.3);
+  padding-bottom: 10px;
+  margin-bottom: 18px;
+}
+
+.screen.win h1 { color: var(--green); }
+.screen.lose h1 { color: var(--red); border-color: rgba(255, 95, 86, 0.4); }
+
+/* ---------- title ---------- */
+.title-block { text-align: center; margin: 12px 0 26px; }
+.title-kicker { font-size: 11px; letter-spacing: 0.34em; color: var(--green-dim); }
+.title-main {
+  font-size: clamp(44px, 9vw, 84px);
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  color: var(--green);
+  text-shadow: 0 0 24px rgba(125, 255, 154, 0.35);
+  margin: 6px 0 0;
+}
+.title-sub {
+  font-size: clamp(16px, 3vw, 26px);
+  letter-spacing: 0.62em;
+  color: var(--amber);
+  margin-top: 2px;
+}
+.title-tag { font-size: 12px; color: rgba(232, 240, 232, 0.7); margin-top: 14px; }
+
+/* ---------- buttons ---------- */
+.btn-col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+
+.btn {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+  background: rgba(125, 255, 154, 0.06);
+  border: 1px solid rgba(125, 255, 154, 0.45);
+  padding: 11px 26px;
+  min-width: 240px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.btn-row .btn { min-width: 170px; }
+.btn:hover { background: rgba(125, 255, 154, 0.16); box-shadow: 0 0 14px rgba(125, 255, 154, 0.2); }
+.btn.primary { color: #04130a; background: var(--green); border-color: var(--green); font-weight: bold; }
+.btn.primary:hover { background: #a9ffbe; }
+.btn.danger { border-color: rgba(255, 95, 86, 0.6); color: var(--red); }
+.btn.danger:hover { background: rgba(255, 95, 86, 0.14); }
+
+.footnote {
+  margin-top: 26px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(232, 240, 232, 0.45);
+}
+
+/* ---------- mission select ---------- */
+.mission-row {
+  display: grid;
+  grid-template-columns: 58px 220px 1fr;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  font-family: var(--mono);
+  background: rgba(125, 255, 154, 0.04);
+  border: 1px solid rgba(125, 255, 154, 0.3);
+  color: var(--ink);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.mission-row:hover:not(.locked) { background: rgba(125, 255, 154, 0.13); }
+.mission-row.locked { opacity: 0.4; cursor: not-allowed; }
+.mission-row.endless { border-color: rgba(255, 180, 84, 0.55); }
+.mission-row.endless:hover { background: rgba(255, 180, 84, 0.1); }
+.m-id { font-size: 19px; color: var(--amber); letter-spacing: 0.1em; }
+.m-name { font-size: 14px; font-weight: bold; letter-spacing: 0.14em; color: var(--green); }
+.m-sub { font-size: 11px; color: rgba(232, 240, 232, 0.6); }
+
+.upg-strip {
+  font-size: 11px;
+  color: rgba(232, 240, 232, 0.7);
+  border: 1px dashed rgba(125, 255, 154, 0.25);
+  padding: 9px 12px;
+  margin-top: 10px;
+}
+.upg-strip b { color: var(--cyan); }
+
+/* ---------- briefing ---------- */
+.brief-sub { font-size: 12px; letter-spacing: 0.2em; color: var(--amber); margin-bottom: 16px; }
+.brief-body { font-size: 13px; line-height: 1.65; color: rgba(232, 240, 232, 0.88); white-space: normal; }
+.brief-body div { min-height: 1.2em; }
+
+/* ---------- tables ---------- */
+table.spec { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.spec td { padding: 7px 10px; border-bottom: 1px solid rgba(125, 255, 154, 0.14); vertical-align: top; }
+table.spec td:first-child { color: var(--green-dim); width: 38%; }
+table.spec.keys td:first-child { color: var(--amber); width: 30%; }
+table.spec.stats td:last-child { color: var(--green); }
+
+.fine { font-size: 11px; line-height: 1.6; color: rgba(232, 240, 232, 0.55); margin-top: 16px; }
+
+/* ---------- debrief ---------- */
+.record {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.3em;
+  color: var(--amber);
+  margin: 16px 0 4px;
+  text-shadow: 0 0 18px rgba(255, 180, 84, 0.5);
+}
+.lose-reason { text-align: center; color: var(--red); letter-spacing: 0.2em; font-size: 13px; margin-top: 14px; }
+
+.upg-title { font-size: 12px; letter-spacing: 0.16em; color: var(--cyan); margin: 18px 0 10px; }
+.upg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.upg-card {
+  font-family: var(--mono);
+  text-align: left;
+  background: rgba(111, 215, 255, 0.05);
+  border: 1px solid rgba(111, 215, 255, 0.4);
+  color: var(--ink);
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.upg-card:hover { background: rgba(111, 215, 255, 0.14); box-shadow: 0 0 14px rgba(111, 215, 255, 0.25); }
+.u-name { font-size: 13px; font-weight: bold; color: var(--cyan); letter-spacing: 0.1em; }
+.u-desc { font-size: 11px; margin-top: 7px; line-height: 1.5; }
+.u-flavor { font-size: 10px; margin-top: 8px; color: rgba(232, 240, 232, 0.45); line-height: 1.45; font-style: italic; }
