@@ -7,6 +7,7 @@ class Game {
     this.mission = mission;
     this.endless = !!(opts && opts.endless);
     this.upgrades = (opts && opts.upgrades) || {};
+    this.diff = DIFFICULTY[(opts && opts.difficulty) || 'STANDARD'] || DIFFICULTY.STANDARD;
     this.rand = Util.rng((Date.now() & 0xffff) ^ 0xBEEF);
 
     this.terrain = new Terrain(TUNE.GROUND_SEED + (this.endless ? 17 : MISSIONS.indexOf(mission)));
@@ -22,7 +23,7 @@ class Game {
     this.shells = [];
     this.toasts = [];
 
-    this.cb = new CBDirector(mission.cbRate);
+    this.cb = new CBDirector(mission.cbRate * this.diff.cb);
     this.windX = (mission.windRange[0] + this.rand() * (mission.windRange[1] - mission.windRange[0])) *
       (this.rand() < 0.5 ? -1 : 1);
 
@@ -62,6 +63,12 @@ class Game {
     this.tutorialMsg = '';
     this._tutStep = 0;
 
+    // juice + events
+    this.slowmoT = 0;
+    this.hitstopT = 0;
+    this._slowmoGroups = {};
+    this.escort = null;
+
     this.applyUpgrades();
     if (this.endless) this.spawnWave(endlessWave(1, this.rand));
     else this.spawnWave(mission);
@@ -74,7 +81,7 @@ class Game {
     this.excalibur = !!u.EXCALIBUR;
     this.lattice = !!u.LATTICE;
     this.ironFist = !!u.IRON_FIST;
-    this.enemyTempo = this.lattice ? 0.75 : 1;
+    this.enemyTempo = (this.lattice ? 0.75 : 1) * this.diff.tempo;
     this.rwsRange = TUNE.RWS_RANGE;
     this.rwsKillChance = TUNE.RWS_KILL_CHANCE;
     if (u.CREW_DRILL) {
@@ -108,9 +115,16 @@ class Game {
     if (this.solution) Sfx.lay();
   }
 
+  /* GPS jamming: a live JAMMER site degrades precision and disables Excalibur
+     guidance — the assessment's open question, made playable. */
+  gpsJammed() {
+    return this.sites.some(s => s.type === 'JAMMER' && !s.dead);
+  }
+
   dispersionAt(range) {
     let sigma = range * (SPEC.DEVIATION_PCT / 100);
     if (this.excalibur) sigma *= 0.2;
+    if (this.gpsJammed()) sigma *= this.excalibur ? 5 : 2.2;
     return Math.max(12, sigma);
   }
 
@@ -245,7 +259,7 @@ class Game {
       x: m.x, y: m.y, v0: c.v0, elevDeg: elev, dir: 1,
       k: Ballistics.dragK(chargeIdx), windX: this.windX,
       mrsiGroup: mrsiShot ? this._mrsiGroupSeq : null,
-      excalibur: this.excalibur && aimX !== undefined,
+      excalibur: this.excalibur && aimX !== undefined && !this.gpsJammed(),
       targetX: aimX
     });
     this.shells.push(sh);
@@ -342,20 +356,23 @@ class Game {
       }
       if (hitSomething) this.hits++;
     } else if (shell.kind === 'rocket') {
-      if (Math.abs(gx - TUNE.FOB_X) < 500) {
+      if (this.escort && !this.escort.dead && Math.abs(gx - this.escort.x) < 120) {
+        this.escort.destroy(this);
+      } else if (Math.abs(gx - TUNE.FOB_X) < 500) {
         this.baseDamage(TUNE.ROCKET_BASE_DMG, 'ROCKET IMPACT AT FOB');
       }
       // a stray can still hurt the gun
-      if (distToPlayer < 60) this.vehicle.takeDamage(12, this);
+      if (distToPlayer < 60) this.vehicle.takeDamage(12 * this.diff.dmg, this);
     } else if (shell.kind === 'cb') {
-      if (distToPlayer < 30) this.vehicle.takeDamage(42, this);
-      else if (distToPlayer < 80) this.vehicle.takeDamage(22, this);
-      else if (distToPlayer < 150) this.vehicle.takeDamage(9, this);
+      if (distToPlayer < 30) this.vehicle.takeDamage(42 * this.diff.dmg, this);
+      else if (distToPlayer < 80) this.vehicle.takeDamage(22 * this.diff.dmg, this);
+      else if (distToPlayer < 150) this.vehicle.takeDamage(9 * this.diff.dmg, this);
     }
   }
 
   onSiteDestroyed(site, mrsi) {
     this.kills++;
+    this.hitstopT = 0.09;
     if (mrsi) this.mrsiKills++;
     this.score += mrsi ? TUNE.SCORE_MRSI_KILL : TUNE.SCORE_KILL;
     const gy = this.terrain.heightAt(site.x);
@@ -399,6 +416,21 @@ class Game {
     } else {
       Sfx.lose();
     }
+    this.score = Math.round(this.score * this.diff.score);
+    Sfx.stopMusic();
+  }
+
+  spawnEscort() {
+    this.escort = new EscortTruck(60);
+    this.toast('RESUPPLY TRUCK INBOUND — KEEP THE ROCKETS OFF IT', TUNE.COL.CYAN, 4);
+  }
+
+  onEscortArrived() {
+    this.vehicle.mag = SPEC.MAGAZINE;
+    this.score += 600;
+    this.baseIntegrity = Math.min(100, this.baseIntegrity + 5);
+    this.toast('CASSETTE DELIVERED — MAGAZINE FULL, +600', TUNE.COL.GREEN, 3.5);
+    Sfx.confirm();
   }
 
   nextEndlessWave() {
@@ -409,6 +441,7 @@ class Game {
     for (const s of w.sites) this.sites.push(new Site(s[0], s[1], s[2]));
     for (const c of w.convoys) this.convoys.push(new Convoy(c.x, c.n, c.speed));
     this.toast('WAVE ' + this.wave + ' — NEW TRACKS ON THE BOARD', TUNE.COL.AMBER, 3.2);
+    if (this.wave % 3 === 0) this.spawnEscort();
     Sfx.alarm();
   }
 
@@ -440,6 +473,15 @@ class Game {
   }
 
   update(dt) {
+    // hit-stop and cinematic slow motion scale the whole simulation
+    if (this.hitstopT > 0) {
+      this.hitstopT -= dt;
+      dt *= 0.06;
+    } else if (this.slowmoT > 0) {
+      this.slowmoT -= dt;
+      dt *= 0.3;
+    }
+
     this.missionT += dt;
     this.env.t = this.missionT;
 
@@ -461,6 +503,7 @@ class Game {
     for (const s of this.sites) s.update(dt, this);
     for (const c of this.convoys) c.update(dt, this);
     for (const d of this.drones) d.update(dt, this);
+    if (this.escort) this.escort.update(dt, this);
     this.drones = this.drones.filter(d => !d.dead || Math.random() > 0.1);
 
     // drone spawner
@@ -477,6 +520,12 @@ class Game {
     for (const sh of this.shells) {
       if (sh.dead) continue;
       sh.update(dt, this);
+      // cinematic slow-mo as an MRSI volley arrives on target
+      if (!sh.dead && sh.mrsiGroup && sh.vy < 0 && !this._slowmoGroups[sh.mrsiGroup] &&
+        sh.y - this.terrain.heightAt(sh.x) < 700) {
+        this._slowmoGroups[sh.mrsiGroup] = true;
+        this.slowmoT = 0.8;
+      }
       if (!sh.dead && sh.kind === 'cb' && this.ironFist && this.interceptsLeft > 0 &&
         sh.vy < 0 && Math.abs(sh.x - this.vehicle.x) < 260 &&
         sh.y < this.terrain.heightAt(this.vehicle.x) + 300) {
@@ -506,6 +555,9 @@ class Game {
     for (const t of this.toasts) t.life -= dt;
     this.toasts = this.toasts.filter(t => t.life > 0);
 
+    Sfx.setTension(this.cb.lockRate > 0
+      ? Math.max(this.cb.lock, this.cb.salvoActive ? 1 : 0) : 0);
+
     this.updateTutorial();
 
     // win / wave logic
@@ -526,14 +578,25 @@ class Game {
 
   render(ctx) {
     const cam = this.camera;
-    this.terrain.draw(ctx, cam, this.env);
-    this.fob.draw(ctx, cam, this);
-    for (const s of this.sites) s.draw(ctx, cam, this);
-    for (const c of this.convoys) c.draw(ctx, cam, this);
-    this.vehicle.draw(ctx, cam, this);
-    for (const d of this.drones) d.draw(ctx, cam);
-    for (const sh of this.shells) sh.draw(ctx, cam);
-    this.particles.draw(ctx, cam);
+    if (typeof PixiWorld !== 'undefined' && PixiWorld.ok) {
+      // world on the GPU canvas underneath; the 2D canvas carries only the HUD
+      PixiWorld.render(this);
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      if (this.vehicle.state === 'REARM' || this.vehicle.state === 'EMPLACING' ||
+        this.vehicle.state === 'DISPLACING') {
+        this.vehicle.drawStateBar(ctx, cam, this);
+      }
+    } else {
+      this.terrain.draw(ctx, cam, this.env);
+      this.fob.draw(ctx, cam, this);
+      for (const s of this.sites) s.draw(ctx, cam, this);
+      for (const c of this.convoys) c.draw(ctx, cam, this);
+      if (this.escort) this.escort.draw(ctx, cam, this);
+      this.vehicle.draw(ctx, cam, this);
+      for (const d of this.drones) d.draw(ctx, cam);
+      for (const sh of this.shells) sh.draw(ctx, cam);
+      this.particles.draw(ctx, cam);
+    }
     HUD.drawWorldOverlays(ctx, this);
     HUD.draw(ctx, this);
   }

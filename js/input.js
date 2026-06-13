@@ -21,16 +21,20 @@ const Input = {
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
     window.addEventListener('blur', () => { this.keys = {}; });
 
-    canvas.addEventListener('mousemove', (e) => {
+    // pointer events cover mouse, touch and pen
+    canvas.addEventListener('pointermove', (e) => {
       const r = canvas.getBoundingClientRect();
       this.mouse.x = (e.clientX - r.left) * (canvas.width / r.width);
       this.mouse.y = (e.clientY - r.top) * (canvas.height / r.height);
     });
-    canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0) { this.mouse.down = true; this.mouse.clicked = true; }
+    canvas.addEventListener('pointerdown', (e) => {
+      const r = canvas.getBoundingClientRect();
+      this.mouse.x = (e.clientX - r.left) * (canvas.width / r.width);
+      this.mouse.y = (e.clientY - r.top) * (canvas.height / r.height);
+      if (e.button === 0 || e.pointerType === 'touch') { this.mouse.down = true; this.mouse.clicked = true; }
       Sfx.init(); Sfx.resume();
     });
-    window.addEventListener('mouseup', () => { this.mouse.down = false; });
+    window.addEventListener('pointerup', () => { this.mouse.down = false; });
     canvas.addEventListener('wheel', (e) => {
       this.mouse.wheel += Math.sign(e.deltaY);
       e.preventDefault();

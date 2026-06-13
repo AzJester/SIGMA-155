@@ -275,7 +275,14 @@ class Vehicle {
     }
     ctx.restore();
 
-    // rearm progress
+    this.drawStateBar(ctx, cam, game);
+  }
+
+  /* Emplace/displace/rearm progress readout — drawn on the HUD canvas so it works
+     with both the WebGL and the fallback renderer. */
+  drawStateBar(ctx, cam, game) {
+    const p = cam.worldToScreen(this.x, this.groundY(game));
+    const s = cam.scale;
     if (this.state === 'REARM') {
       const f = this.rearmT / this.resupplyTime;
       this._bar(ctx, p.x, p.y - 110 * Math.min(1, s), 'REARMING CASSETTE', f, TUNE.COL.AMBER);

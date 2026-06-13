@@ -25,8 +25,8 @@ up to 70 km downrange, and **displace before the counter-battery response arrive
 It is also GitHub Pages-ready: enable Pages on this repository (deploy from branch, root)
 and the game is live at the Pages URL.
 
-Desktop + keyboard/mouse recommended. Progress, upgrades, and high scores persist in
-`localStorage`.
+Desktop keyboard/mouse gives the best experience; touch screens get on-screen controls.
+Progress, upgrades, difficulty, and high scores persist in `localStorage`.
 
 ## How it plays
 
@@ -91,10 +91,28 @@ The core loop is **shoot and scoot**:
 
 See [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) for the full design and technical plan.
 
+### Difficulty, jamming, and the resupply run
+
+- **Threat level** (EASY / STANDARD / VETERAN) is selectable on every briefing screen and
+  scales counter-battery pressure, enemy tempo, damage, and score.
+- **GPS jammers** (mission 4 and endless waves) degrade FCS precision and knock Excalibur
+  guidance offline until destroyed — the assessment's electronic-warfare question, made playable.
+- **Resupply escort** (endless, every third wave): a cassette truck runs the gauntlet to the
+  FOB while the rockets hunt it. If it arrives, your magazine refills instantly.
+
+![GPS jammer](docs/screenshots/jammer.png)
+
 ## Tech
 
-Plain HTML5 Canvas + vanilla JS (classic scripts, global scope — runs from `file://`),
-Web Audio API for fully synthesized sound, procedural vector art (no image or audio assets).
+**Rendering:** WebGL via a vendored PixiJS 8 (no CDN, no build step) draws the world —
+additive-blended glows and tracers, mass particles, dynamic muzzle/explosion lighting,
+retina resolution, per-mission color grading — while the original Canvas 2D engine renders
+the HUD on a transparent layer above it and remains a full automatic fallback when WebGL
+is unavailable (`?renderer=2d` forces it). Touch screens get on-screen controls and a scaled
+HUD. Audio is fully synthesized with the Web Audio API, including a generative ambient score
+whose tension layer swells with the counter-battery threat. Cinematic touches: hit-stop on
+kills and slow-motion as MRSI volleys arrive.
+
 Real-unit ballistics: gravity + quadratic drag + wind, integrated at 11× time compression,
 with table-driven fire-control solvers (low/high arc, wind and target-altitude compensation,
 MRSI scheduling).
@@ -108,6 +126,8 @@ node test/ballistics_test.js     # solver/range-table sanity (no browser needed)
 PLAYWRIGHT_BROWSERS_PATH=<browsers> NODE_PATH=<global node_modules> node test/smoke.js
 ```
 
-The smoke test boots the game, plays the tutorial (emplace → target → fire → MRSI),
-forces a counter-battery exchange on mission 2, verifies the scoot mechanic and rearm cycle,
-and fails on any JS error. Screenshots land in `test/shots/`.
+The smoke test runs two passes: a WebGL boot/visual pass, then a full deterministic
+playthrough on the 2D fallback (headless GL is software-rendered and too slow for timing
+assertions). It plays the tutorial (emplace → target → fire → MRSI), forces a counter-battery
+exchange on mission 2, verifies the scoot mechanic and rearm cycle, and fails on any JS error.
+Screenshots land in `test/shots/`.

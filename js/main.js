@@ -11,7 +11,7 @@ const App = {
   _last: 0,
   _attractFireT: 3,
 
-  init() {
+  async init() {
     this.canvas = document.getElementById('game');
     this.ctx = this.canvas.getContext('2d');
     this.resize();
@@ -20,8 +20,16 @@ const App = {
     Save.load();
     Input.init(this.canvas);
     Screens.init();
+    Touch.init();
     Sfx.enabled = Save.data.settings.sound;
     this.applyCrt();
+
+    // WebGL world renderer; the 2D canvas path remains as automatic fallback.
+    // ?renderer=2d forces the fallback (software-GL environments, tests).
+    const forced2d = new URLSearchParams(location.search).get('renderer') === '2d';
+    if (!forced2d) await PixiWorld.create();
+    this.renderer = PixiWorld.ok ? 'webgl' : 'canvas2d';
+    console.log('[SIGMA155] renderer: ' + this.renderer);
 
     Ballistics.buildTables();
 
@@ -55,6 +63,8 @@ const App = {
   toTitle() {
     this.state = 'MENU';
     this.game = null;
+    Sfx.stopMusic();
+    document.body.classList.remove('in-game');
     Screens.showTitle();
   },
 
@@ -86,10 +96,13 @@ const App = {
   _newGame() {
     this.game = new Game(this.canvas, this.pending.mission, {
       endless: this.pending.endless,
-      upgrades: Save.data.upgrades
+      upgrades: Save.data.upgrades,
+      difficulty: Save.data.difficulty
     });
     if (!Save.data.settings.shake) this.game.camera.addShake = function () {};
     Screens.hide();
+    document.body.classList.add('in-game');
+    Sfx.startMusic(this.game.env.stars);
     this.state = 'PLAY';
   },
 
@@ -106,7 +119,7 @@ const App = {
   },
 
   loop(ts) {
-    const dt = Math.min(0.05, Math.max(0.001, (ts - this._last) / 1000 || 0.016));
+    const dt = Math.min(0.1, Math.max(0.001, (ts - this._last) / 1000 || 0.016));
     this._last = ts;
     const ctx = this.ctx;
 
@@ -158,10 +171,15 @@ const App = {
     const d = a.vehicle.targetElev - a.vehicle.elevDeg;
     a.vehicle.elevDeg += Util.clamp(d, -TUNE.LAY_RATE_DEG * dt, TUNE.LAY_RATE_DEG * dt);
 
-    a.terrain.draw(ctx, a.camera, a.env);
-    a.vehicle.draw(ctx, a.camera, a);
     a.particles.update(dt);
-    a.particles.draw(ctx, a.camera);
+    if (PixiWorld.ok) {
+      PixiWorld.render(a);
+      ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    } else {
+      a.terrain.draw(ctx, a.camera, a.env);
+      a.vehicle.draw(ctx, a.camera, a);
+      a.particles.draw(ctx, a.camera);
+    }
   }
 };
 

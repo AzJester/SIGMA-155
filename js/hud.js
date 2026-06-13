@@ -2,8 +2,9 @@
 'use strict';
 
 const HUD = {
-  regions: [],          // clickable rects rebuilt each frame: {x,y,w,h,action,data}
+  regions: [],          // clickable rects rebuilt each frame (in UI-scaled coords)
   MAP_H: 78,
+  uiScale: 1,           // < 1 on small / touch screens
 
   font(ctx, px, bold) {
     ctx.font = (bold ? 'bold ' : '') + px + 'px Consolas, Menlo, "DejaVu Sans Mono", monospace';
@@ -29,8 +30,12 @@ const HUD = {
 
   draw(ctx, game) {
     this.regions = [];
-    const W = ctx.canvas.width, H = ctx.canvas.height;
+    const realW = ctx.canvas.width;
+    this.uiScale = realW < 1000 ? Math.max(0.58, realW / 1240) : 1;
+    const W = ctx.canvas.width / this.uiScale, H = ctx.canvas.height / this.uiScale;
     const C = TUNE.COL;
+    ctx.save();
+    ctx.scale(this.uiScale, this.uiScale);
 
     this.drawStatus(ctx, game, W);
     this.drawGunPanel(ctx, game, H);
@@ -39,12 +44,15 @@ const HUD = {
     this.drawWarnings(ctx, game, W, H);
     this.drawToasts(ctx, game, W);
 
-    // key hints footer
-    this.font(ctx, 11);
-    ctx.fillStyle = 'rgba(232,240,232,0.5)';
-    ctx.textAlign = 'left';
-    ctx.fillText('[A/D] DRIVE  [E] EMPLACE  [CLICK] TARGET  [SPACE] FIRE  [M] MRSI  [Q/Z] CHARGE  [↑/↓] ELEV  [R] REARM  [TAB] MAP  [C] CAM  [P] PAUSE  [H] HELP',
-      12, H - this.MAP_H - 8);
+    // key hints footer (pointless on touch layouts)
+    if (!(typeof Touch !== 'undefined' && Touch.active)) {
+      this.font(ctx, 11);
+      ctx.fillStyle = 'rgba(232,240,232,0.5)';
+      ctx.textAlign = 'left';
+      ctx.fillText('[A/D] DRIVE  [E] EMPLACE  [CLICK] TARGET  [SPACE] FIRE  [M] MRSI  [Q/Z] CHARGE  [↑/↓] ELEV  [R] REARM  [TAB] MAP  [C] CAM  [P] PAUSE  [H] HELP',
+        12, H - this.MAP_H - 8);
+    }
+    ctx.restore();
     void C;
   },
 
@@ -245,6 +253,15 @@ const HUD = {
     const fx = this.mapX(TUNE.FOB_X, W);
     ctx.fillRect(fx - 3, baseY - 8, 6, 6);
 
+    // friendly resupply truck
+    if (game.escort && !game.escort.dead) {
+      ctx.fillStyle = C.CYAN;
+      const ex = this.mapX(game.escort.x, W);
+      ctx.fillRect(ex - 2, baseY - 5, 4, 4);
+      ctx.strokeStyle = C.CYAN;
+      ctx.strokeRect(ex - 4.5, baseY - 7.5, 9, 9);
+    }
+
     // vehicle
     const vx = this.mapX(game.vehicle.x, W);
     ctx.fillStyle = game.vehicle.destroyed ? C.RED : C.GREEN;
@@ -314,6 +331,12 @@ const HUD = {
       ctx.fillStyle = C.AMBER;
       ctx.fillText('CB RADAR TRACKING — MOVE AFTER NEXT ROUNDS', W / 2, 64);
     }
+    if (game.gpsJammed()) {
+      this.font(ctx, 13, true);
+      ctx.fillStyle = C.AMBER;
+      ctx.fillText('GPS DEGRADED — JAMMER ACTIVE, DISPERSION INCREASED' +
+        (game.excalibur ? ', EXCALIBUR GUIDANCE OFFLINE' : ''), W / 2, 86);
+    }
     if (game.tutorialMsg) {
       this.font(ctx, 14, true);
       ctx.fillStyle = C.CYAN;
@@ -377,6 +400,8 @@ const HUD = {
 
   /* Returns true if a click at canvas coords was consumed by a HUD element. */
   handleClick(mx, my, game) {
+    mx /= this.uiScale;
+    my /= this.uiScale;
     for (const r of this.regions) {
       if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
         if (r.action === 'select') {

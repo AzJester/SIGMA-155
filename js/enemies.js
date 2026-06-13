@@ -5,6 +5,7 @@ const SITE_DEFS = {
   ROCKET: { hp: 60, label: 'ROCKET SITE', desc: 'Launches salvos at the FOB' },
   GUN:    { hp: 80, label: 'ENEMY BATTERY', desc: 'Shoots the counter-battery missions' },
   RADAR:  { hp: 50, label: 'CB RADAR', desc: 'Doubles counter-battery lock rate' },
+  JAMMER: { hp: 45, label: 'GPS JAMMER', desc: 'Degrades FCS precision while alive' },
   ATGM:   { hp: 35, label: 'ATGM TEAM', desc: 'High-value position' },
   DUMP:   { hp: 110, label: 'SUPPLY DUMP', desc: 'Soft target, big score' }
 };
@@ -30,9 +31,14 @@ class Site {
       this.launchT -= dt * game.enemyTempo;
       if (this.launchT <= 0) {
         this.launchT = this.launchInterval * (0.8 + Math.random() * 0.4);
-        launchEnemyRocket(game, this.x, TUNE.FOB_X, 400);
+        // when a resupply escort is rolling, the rockets go after the truck
+        const escort = game.escort && !game.escort.dead && Math.random() < 0.6;
+        const tx = escort ? game.escort.x + 60 : TUNE.FOB_X;
+        launchEnemyRocket(game, this.x, tx, escort ? 260 : 400);
         game.particles.muzzleFlash(this.x, game.terrain.heightAt(this.x) + 3, -0.5, 0.85);
-        game.toast('ROCKET LAUNCH — ' + Util.fmtKm(this.x - game.vehicle.x, 0), TUNE.COL.AMBER);
+        game.toast(escort
+          ? 'ROCKET LAUNCH — TARGETING RESUPPLY TRUCK'
+          : 'ROCKET LAUNCH — ' + Util.fmtKm(this.x - game.vehicle.x, 0), TUNE.COL.AMBER);
       }
     }
   }
@@ -63,7 +69,7 @@ class Site {
       ctx.font = '9px Consolas, Menlo, monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = ctx.strokeStyle;
-      ctx.fillText({ ROCKET: 'RKT', GUN: 'ART', RADAR: 'RDR', ATGM: 'AT', DUMP: 'SUP' }[this.type], p.x, p.y - 15);
+      ctx.fillText({ ROCKET: 'RKT', GUN: 'ART', RADAR: 'RDR', JAMMER: 'JAM', ATGM: 'AT', DUMP: 'SUP' }[this.type], p.x, p.y - 15);
       ctx.textAlign = 'left';
       return;
     }
@@ -111,6 +117,23 @@ class Site {
       ctx.fillStyle = alive ? '#7a8577' : '#33302a';
       ctx.fillRect(-1.7, -1.5, 3.4, 1.5);
       ctx.restore();
+    } else if (this.type === 'JAMMER') {
+      ctx.fillStyle = c2;
+      ctx.fillRect(-0.35, -5.2, 0.7, 5.2);                  // mast
+      ctx.fillRect(-1.9, -1.2, 3.8, 1.2);                   // shelter
+      ctx.fillStyle = alive ? '#8a7f5d' : '#33302a';
+      ctx.beginPath(); ctx.arc(0, -5.4, 0.7, 0, Math.PI * 2); ctx.fill();
+      if (alive) {
+        const ph = (this.anim % 1.6) / 1.6;
+        ctx.strokeStyle = TUNE.COL.AMBER;
+        for (let i = 0; i < 2; i++) {
+          const pp = (ph + i * 0.5) % 1;
+          ctx.globalAlpha = 0.7 * (1 - pp);
+          ctx.lineWidth = 0.16;
+          ctx.beginPath(); ctx.arc(0, -5.4, 1.2 + pp * 3.4, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
     } else if (this.type === 'ATGM') {
       ctx.fillStyle = c2;
       ctx.fillRect(-1.8, -1.0, 3.6, 1.0);                   // berm
@@ -373,6 +396,64 @@ class CBDirector {
         this.incoming = 0;
       }
     }
+  }
+}
+
+/* Friendly resupply truck — escort event: it drives in from the rear toward the FOB
+   under rocket fire; if it arrives, the gun gets an instant full cassette. */
+class EscortTruck {
+  constructor(x) {
+    this.x = x;
+    this.speed = 13;
+    this.dead = false;
+    this.arrived = false;
+    this.label = 'RESUPPLY TRUCK';
+  }
+
+  update(dt, game) {
+    if (this.dead) return;
+    this.x += this.speed * dt;
+    if (Math.random() < dt * 3) game.particles.dust(this.x - 4, game.terrain.heightAt(this.x), 1);
+    if (this.x >= TUNE.FOB_X) {
+      this.dead = true;
+      this.arrived = true;
+      game.onEscortArrived(this);
+    }
+  }
+
+  destroy(game) {
+    if (this.dead) return;
+    this.dead = true;
+    game.particles.explosion(this.x, game.terrain.heightAt(this.x) + 2, 1.1);
+    Sfx.impact(Math.abs(this.x - game.camera.x));
+    game.toast('RESUPPLY TRUCK LOST — NO CASSETTE THIS WAVE', TUNE.COL.RED, 3.5);
+  }
+
+  draw(ctx, cam, game) {
+    if (this.dead) return;
+    const gy = game.terrain.heightAt(this.x);
+    const p = cam.worldToScreen(this.x, gy);
+    if (p.x < -80 || p.x > ctx.canvas.width + 80) return;
+    const s = cam.scale;
+    if (s < 0.10) {
+      ctx.fillStyle = TUNE.COL.CYAN;
+      ctx.fillRect(p.x - 4, p.y - 7, 8, 5);
+      return;
+    }
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.scale(s, s);
+    ctx.fillStyle = '#46523f';
+    ctx.fillRect(-3.4, -2.4, 6.8, 1.7);
+    ctx.fillStyle = '#52604a';
+    ctx.fillRect(1.6, -3.3, 1.8, 0.9);
+    ctx.fillStyle = '#3c4636';
+    ctx.fillRect(-3.0, -3.6, 4.0, 1.2);      // cassette pod
+    ctx.fillStyle = '#1c1c19';
+    for (const wx of [-2.4, -0.6, 1.4, 2.8]) {
+      ctx.beginPath(); ctx.arc(wx, -0.8, 0.8, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 }
 

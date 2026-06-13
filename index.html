@@ -9,16 +9,34 @@
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="touch-ui">
+  <div class="t-cluster t-left">
+    <button class="t-btn" id="tb-left">◀</button>
+    <button class="t-btn" id="tb-right">▶</button>
+    <button class="t-btn" id="tb-emplace">EMP</button>
+    <button class="t-btn" id="tb-rearm">ARM</button>
+  </div>
+  <div class="t-cluster t-right">
+    <button class="t-btn t-small" id="tb-map">MAP</button>
+    <button class="t-btn t-small" id="tb-cam">CAM</button>
+    <button class="t-btn t-small" id="tb-pause">II</button>
+    <button class="t-btn" id="tb-mrsi">MRSI</button>
+    <button class="t-btn t-fire" id="tb-fire">FIRE</button>
+  </div>
+</div>
 <div id="overlay"></div>
 <div id="crt-fx"></div>
 
+<script src="vendor/pixi.min.js"></script>
 <script src="js/util.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/ballistics.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/input.js"></script>
+<script src="js/touch.js"></script>
 <script src="js/terrain.js"></script>
 <script src="js/camera.js"></script>
+<script src="js/render_pixi.js"></script>
 <script src="js/particles.js"></script>
 <script src="js/projectile.js"></script>
 <script src="js/vehicle.js"></script>

@@ -13,6 +13,7 @@ const Save = {
     this.data.bestEndless = this.data.bestEndless || 0;
     this.data.bestWave = this.data.bestWave || 0;
     this.data.settings = Object.assign({ sound: true, shake: true, crt: true }, this.data.settings);
+    this.data.difficulty = this.data.difficulty || 'STANDARD';
     return this.data;
   },
   store() {
@@ -57,6 +58,11 @@ const Screens = {
       case 'resume': App.resume(); break;
       case 'restart': App.restartMission(); break;
       case 'pause-back': this.showPause(); break;
+      case 'set-diff':
+        Save.data.difficulty = arg;
+        Save.store();
+        if (App.pending) this.showBriefing(App.pending.mission);
+        break;
       case 'pick-upgrade': {
         Save.data.upgrades[arg] = true;
         Save.store();
@@ -167,9 +173,15 @@ const Screens = {
 
   showBriefing(mission) {
     const body = mission.briefing.map(l => l === '' ? '<br>' : '<div>' + l + '</div>').join('');
+    const cur = Save.data.difficulty || 'STANDARD';
+    const diffRow = '<div class="diff-row"><span>THREAT LEVEL:</span>' +
+      Object.keys(DIFFICULTY).map(k =>
+        '<button class="diff-btn' + (k === cur ? ' sel' : '') + '" data-action="set-diff" data-arg="' + k + '">' +
+        DIFFICULTY[k].name + '</button>').join('') + '</div>';
     this.show(this.frame(mission.id + ' — ' + mission.name,
       '<div class="brief-sub">' + mission.sub + '</div>' +
       '<div class="brief-body">' + body + '</div>' +
+      diffRow +
       '<div class="btn-row">' +
       '<button class="btn" data-action="select">BACK</button>' +
       '<button class="btn primary" data-action="launch">START MISSION</button>' +

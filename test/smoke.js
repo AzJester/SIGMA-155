@@ -24,7 +24,21 @@ const { chromium } = require('playwright');
     else { failures++; console.error('FAIL  ' + label + (detail ? '  [' + detail + ']' : '')); }
   };
 
+  // ---- pass 1: WebGL renderer boots and draws without errors (headless GL is
+  // software-rendered and slow, so gameplay timing is tested on the 2D path below)
   await page.goto('file://' + path.join(root, 'index.html'));
+  await page.waitForTimeout(2000);
+  check('title screen shows (webgl)', await page.isVisible('text=DEPLOY'));
+  const rend1 = await page.evaluate(() => App.renderer);
+  console.log('  --  default renderer: ' + rend1);
+  await shot('00-title-webgl.png');
+  await page.evaluate(() => { App.startMission(0); App.launchLoaded(); });
+  await page.waitForTimeout(5000);
+  await shot('00-ingame-webgl.png');
+  check('webgl boot produced no JS errors', errors.length === 0, errors.slice(0, 2).join(' | '));
+
+  // ---- pass 2: full deterministic playthrough on the canvas2d fallback
+  await page.goto('file://' + path.join(root, 'index.html') + '?renderer=2d');
   await page.waitForTimeout(1600);
   await shot('01-title.png');
   check('title screen shows', await page.isVisible('text=DEPLOY'));
@@ -109,8 +123,9 @@ const { chromium } = require('playwright');
     targetX: App.game.mrsiTargetX
   }));
   check('MRSI sequence started', mrsi.active && mrsi.planned >= 2, 'rounds=' + mrsi.planned);
-  // wait out the full sequence + flight (~12 s viewer at 15 km), then check grouping
-  await page.waitForTimeout(15000);
+  // wait out the full sequence + flight (~12 s viewer at 15 km, plus the
+  // cinematic slow-mo on arrival), then check grouping
+  await page.waitForTimeout(18000);
   await shot('07-mrsi.png');
   const group = await page.evaluate((tx) => {
     const g = App.game;

@@ -92,6 +92,13 @@ const TUNE = {
   }
 };
 
+/* Difficulty tiers: multipliers on CB lock rate, enemy tempo, damage taken, score */
+const DIFFICULTY = {
+  EASY:     { name: 'EASY',     cb: 0.6, tempo: 0.8,  dmg: 0.6, score: 0.75 },
+  STANDARD: { name: 'STANDARD', cb: 1.0, tempo: 1.0,  dmg: 1.0, score: 1.0 },
+  VETERAN:  { name: 'VETERAN',  cb: 1.4, tempo: 1.25, dmg: 1.3, score: 1.25 }
+};
+
 /* Upgrade pool — each entry maps to a fact in the assessment */
 const UPGRADES = {
   IRON_FIST: {

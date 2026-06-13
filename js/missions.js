@@ -133,13 +133,16 @@ const MISSIONS = [
       '',
       'The 70 km figure is a manufacturer claim. You are about to verify it.',
       '',
-      'Wind is strong at altitude; the FCS compensates, but dispersion grows',
-      'with range. MRSI from CHG 6 is your deepest hammer. Rocket sites closer',
-      'in will keep pressure on the FOB — manage both.'
+      'One complication: a GPS jammer is active in the objective area. Until',
+      'you kill it, precision degrades sharply — Ukraine showed what jamming',
+      'does to GPS-guided artillery. Wind is strong at altitude; the FCS',
+      'compensates, but dispersion grows with range. MRSI from CHG 6 is your',
+      'deepest hammer. Rocket sites closer in keep pressure on the FOB.'
     ],
     sites: [
       ['RADAR', 47500],
       ['GUN', 52500],
+      ['JAMMER', 56500],
       ['DUMP', 58500],
       ['GUN', 64000],
       ['DUMP', 69000],
@@ -163,9 +166,12 @@ const ENDLESS = {
     '"One battery now delivers the fire volume that previously took a',
     'battalion." Tonight the claim gets stress-tested.',
     '',
-    'Waves of rocket sites, batteries, radars and convoys will keep coming,',
-    'each wave deeper and faster than the last. Hold base integrity, keep the',
-    'gun alive, and run the magazine like the automation was built to do.',
+    'Waves of rocket sites, batteries, radars, jammers and convoys will keep',
+    'coming, each wave deeper and faster than the last. Hold base integrity,',
+    'keep the gun alive, and run the magazine like the automation was built to.',
+    '',
+    'Every third wave a resupply truck runs the gauntlet to the FOB. The',
+    'rockets will go after it — keep them suppressed and the cassette is yours.',
     '',
     'There is no end state. There is only the score.'
   ]
@@ -180,10 +186,11 @@ function endlessWave(waveNum, rand) {
     const minR = 8000 + waveNum * 800;
     const maxR = Math.min(72000, 20000 + waveNum * 5200);
     const x = minR + rand() * (maxR - minR);
-    if (roll < 0.42) sites.push(['ROCKET', x, { interval: Math.max(16, 30 - waveNum * 1.5) }]);
-    else if (roll < 0.62) sites.push(['GUN', x]);
-    else if (roll < 0.76) sites.push(['RADAR', x]);
-    else if (roll < 0.88) sites.push(['ATGM', x]);
+    if (roll < 0.40) sites.push(['ROCKET', x, { interval: Math.max(16, 30 - waveNum * 1.5) }]);
+    else if (roll < 0.58) sites.push(['GUN', x]);
+    else if (roll < 0.70) sites.push(['RADAR', x]);
+    else if (roll < 0.80 && waveNum >= 3) sites.push(['JAMMER', x]);
+    else if (roll < 0.90) sites.push(['ATGM', x]);
     else sites.push(['DUMP', x]);
   }
   const convoys = [];

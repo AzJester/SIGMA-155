@@ -22,11 +22,62 @@ html, body {
   color: var(--ink);
 }
 
+#gl-stage {
+  position: fixed; inset: 0;
+  display: block;
+  z-index: 0;
+  touch-action: none;
+}
+
 #game {
   position: fixed; inset: 0;
   display: block;
   cursor: crosshair;
+  z-index: 1;
+  background: transparent;
+  touch-action: none;
 }
+
+/* ---------- touch controls ---------- */
+#touch-ui { display: none; }
+body.in-game #touch-ui.on {
+  display: block;
+  position: fixed; inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.t-cluster {
+  position: absolute;
+  bottom: 96px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.t-left { left: 12px; }
+.t-right { right: 12px; }
+.t-btn {
+  pointer-events: auto;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(125, 255, 154, 0.55);
+  background: rgba(8, 16, 10, 0.55);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: bold;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.t-btn.held { background: rgba(125, 255, 154, 0.3); }
+.t-btn.t-fire {
+  width: 84px; height: 84px;
+  border-color: rgba(255, 95, 86, 0.7);
+  color: var(--red);
+  font-size: 16px;
+}
+.t-btn.t-small { width: 48px; height: 48px; font-size: 11px; }
 
 /* ---------- CRT filter ---------- */
 #crt-fx { display: none; }
@@ -167,6 +218,27 @@ h1 {
 .brief-sub { font-size: 12px; letter-spacing: 0.2em; color: var(--amber); margin-bottom: 16px; }
 .brief-body { font-size: 13px; line-height: 1.65; color: rgba(232, 240, 232, 0.88); white-space: normal; }
 .brief-body div { min-height: 1.2em; }
+
+.diff-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 18px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: rgba(232, 240, 232, 0.6);
+}
+.diff-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 6px 14px;
+  background: rgba(125, 255, 154, 0.04);
+  border: 1px solid rgba(125, 255, 154, 0.3);
+  color: var(--ink);
+  cursor: pointer;
+}
+.diff-btn.sel { background: var(--green); color: #04130a; font-weight: bold; }
 
 /* ---------- tables ---------- */
 table.spec { width: 100%; border-collapse: collapse; font-size: 13px; }

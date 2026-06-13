@@ -7,6 +7,7 @@ const Sfx = {
   master: null,
   enabled: true,
   _noiseBuf: null,
+  music: null,
 
   init() {
     if (this.ctx) return;
@@ -25,6 +26,78 @@ const Sfx = {
 
   resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
   setEnabled(on) { this.enabled = on; if (this.master) this.master.gain.value = on ? 0.5 : 0; },
+
+  /* ---- generative ambient score: low drone bed + a tension layer that swells
+     with the counter-battery threat ---- */
+  startMusic(night) {
+    this.init();
+    if (!this.ctx) return;
+    this.stopMusic();
+    const c = this.ctx, t = c.currentTime;
+    const out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.16, t + 4);
+    out.connect(this.master);
+
+    const root = night ? 55 : 65.4; // A1 / C2
+    const nodes = [];
+    const mk = (type, freq, gain, dest) => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.value = freq; g.gain.value = gain;
+      o.connect(g); g.connect(dest); o.start(t);
+      nodes.push(o);
+      return o;
+    };
+
+    // drone bed through a slowly breathing lowpass
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 240; lp.Q.value = 0.7;
+    lp.connect(out);
+    mk('sawtooth', root, 0.30, lp);
+    mk('sawtooth', root * 1.498, 0.18, lp);    // fifth
+    mk('sine', root / 2, 0.42, out);           // sub
+    const lfo = c.createOscillator(), lfoG = c.createGain();
+    lfo.frequency.value = 0.05; lfoG.gain.value = 90;
+    lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start(t);
+    nodes.push(lfo);
+
+    // tension layer: minor-second shimmer + filtered noise, gated by setTension()
+    const tens = c.createGain();
+    tens.gain.value = 0;
+    tens.connect(out);
+    mk('triangle', root * 2 * 1.067, 0.5, tens);   // flat ninth — unease
+    mk('triangle', root * 4, 0.22, tens);
+    const trem = c.createOscillator(), tremG = c.createGain();
+    trem.frequency.value = 3.4; tremG.gain.value = 0.18;
+    trem.connect(tremG); tremG.connect(tens.gain); trem.start(t);
+    nodes.push(trem);
+    const nsrc = c.createBufferSource();
+    nsrc.buffer = this._noiseBuf; nsrc.loop = true;
+    const nbp = c.createBiquadFilter();
+    nbp.type = 'bandpass'; nbp.frequency.value = 620; nbp.Q.value = 1.2;
+    const ng = c.createGain(); ng.gain.value = 0.25;
+    nsrc.connect(nbp); nbp.connect(ng); ng.connect(tens);
+    nsrc.start(t);
+    nodes.push(nsrc);
+
+    this.music = { out: out, tension: tens, nodes: nodes };
+  },
+
+  setTension(v) {
+    if (!this.music || !this.ctx) return;
+    const target = Math.max(0, Math.min(1, v)) * 0.45;
+    this.music.tension.gain.setTargetAtTime(target, this.ctx.currentTime, 0.6);
+  },
+
+  stopMusic() {
+    if (!this.music || !this.ctx) { this.music = null; return; }
+    const m = this.music, t = this.ctx.currentTime;
+    this.music = null;
+    try {
+      m.out.gain.setTargetAtTime(0.0001, t, 0.4);
+      for (const n of m.nodes) n.stop(t + 1.8);
+    } catch (e) { /* nodes may already be stopped */ }
+  },
 
   _noise(t0, dur, freq, q, gain, slideTo) {
     const c = this.ctx;
